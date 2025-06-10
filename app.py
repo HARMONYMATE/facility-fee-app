@@ -149,16 +149,22 @@ for fac, is_hall in 施設一覧:
     })
 
 df_out = pd.DataFrame(output_rows)
-df_out.loc["合計"] = ["合計", "",
-                    df_out["規定額"].apply(lambda x: x if isinstance(x, int) else 0).sum(),
-                    df_out["減免額"].apply(lambda x: x if isinstance(x, int) else 0).sum(),
-                    df_out["利用金額"].apply(lambda x: x if isinstance(x, int) else 0).sum()]
 
-st.table(df_out.reset_index(drop=True).style.hide(axis='index'))
+# 合計行を辞書で追加
+total_row = {
+    "施設名": "合計",
+    "利用区分": "",
+    "規定額": df_out["規定額"].apply(lambda x: x if isinstance(x, int) else 0).sum(),
+    "減免額": df_out["減免額"].apply(lambda x: x if isinstance(x, int) else 0).sum(),
+    "利用金額": df_out["利用金額"].apply(lambda x: x if isinstance(x, int) else 0).sum()
+}
+df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
+
+st.table(df_out.style.hide(axis='index'))
 
 # --- 消費税計算 ---
 try:
-    total = int(df_out[df_out["施設名"] == "合計"]["利用金額"])
+    total = int(total_row["利用金額"])
     tax = total // 11  # 内税として10%を取り出すなら 1/11
     st.markdown(f"**消費税相当額（内税）**： ¥{tax:,}")
 except:
