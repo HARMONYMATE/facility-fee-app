@@ -404,7 +404,7 @@ for facility, is_hall in 施設一覧:
             "施設名": facility,
             "利用区分": display_time,
             "規定額": base_price,
-            "減��額": reduction,
+            "減免額": reduction,
             "利用金額": real_price,
         }
     )
@@ -422,7 +422,7 @@ total_row = {
     "施設名": "合計",
     "利用区分": "",
     "規定額": int(df_out["規定額"].sum()),
-    "減��額": int(df_out["減��額"].sum()),
+    "減免額": int(df_out["減免額"].sum()),
     "利用金額": int(df_out["利用金額"].sum()),
 }
 df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
@@ -436,7 +436,7 @@ formatted_table = (
     .format(
         {
             "規定額": lambda value: f"{int(value):,}",
-            "減��額": lambda value: f"{int(value):,}",
+            "減免額": lambda value: f"{int(value):,}",
             "利用金額": lambda value: f"{int(value):,}",
         }
     )
