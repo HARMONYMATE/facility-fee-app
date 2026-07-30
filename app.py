@@ -364,6 +364,10 @@ for column, label in zip(
 
 選択時間帯 = {}
 for facility, _ in 施設一覧:
+    any_selected_before_render = any(
+        st.session_state.get(f"{facility}_{time}", False)
+        for time in 時間区分候補
+    )
     all_selected_before_render = all(
         st.session_state.get(f"{facility}_{time}", False)
         for time in 時間区分候補
@@ -375,7 +379,7 @@ for facility, _ in 施設一覧:
         key=f"{facility}_all_times",
         on_click=toggle_all_times,
         args=(facility,),
-        type="primary" if all_selected_before_render else "secondary",
+        type="primary" if any_selected_before_render else "secondary",
         use_container_width=True,
     )
 
