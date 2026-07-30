@@ -15,43 +15,75 @@ st.markdown(
     """
     <style>
     .block-container {
-        max-width: 1120px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
+        max-width: 1180px;
+        padding-top: 0.7rem;
+        padding-bottom: 1rem;
+    }
+    .app-title {
+        color: #1e293b;
+        font-size: 1.35rem;
+        font-weight: 700;
+        line-height: 1.3;
+        margin: 0 0 0.1rem 0;
     }
     .app-caption {
         color: #64748b;
-        margin-top: -0.5rem;
-        margin-bottom: 1.5rem;
+        font-size: 0.88rem;
+        margin: 0 0 0.65rem 0;
+    }
+    .section-title {
+        color: #334155;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.25;
+        margin: 0.5rem 0 0.2rem 0;
+        padding-bottom: 0.15rem;
+        border-bottom: 1px solid #e2e8f0;
     }
     .facility-header {
         color: #64748b;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
         font-weight: 700;
-        padding-bottom: 0.35rem;
+        padding-bottom: 0.15rem;
         border-bottom: 1px solid #e2e8f0;
     }
     .facility-name {
         color: #31333f;
+        font-size: 0.92rem;
         font-weight: 700;
-        padding-top: 0.45rem;
+        padding-top: 0.25rem;
     }
     .facility-name.selected {
         color: #2563eb;
     }
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-color: #e2e8f0;
-        border-radius: 12px;
+    div[data-testid="stRadio"] {
+        margin-bottom: -0.25rem;
+    }
+    div[data-testid="stRadio"] > label {
+        font-size: 0.85rem;
+        margin-bottom: 0.05rem;
+    }
+    div[data-testid="stToggle"] {
+        margin-bottom: -0.25rem;
     }
     div[data-testid="stTable"] table {
         width: 100%;
     }
     div[data-testid="stTable"] th,
     div[data-testid="stTable"] td {
-        padding: 0.45rem 0.65rem !important;
+        padding: 0.22rem 0.45rem !important;
+        font-size: 0.88rem;
     }
     div[data-testid="stAlert"] {
-        border-radius: 10px;
+        border-radius: 8px;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+    }
+    .tax-line {
+        color: #334155;
+        font-size: 0.9rem;
+        text-align: right;
+        margin-top: 0.2rem;
     }
     </style>
     """,
@@ -238,9 +270,9 @@ def calculate_prices(
     return display_time, base_price, base_price - real_price, real_price
 
 
-st.title("施設利用料 自動計算ツール")
 st.markdown(
-    '<p class="app-caption">利用条件と時間帯を選択すると、料金を自動計算します。</p>',
+    '<div class="app-title">施設利用料 自動計算ツール</div>'
+    '<div class="app-caption">利用条件と時間帯を選択すると、料金を自動計算します。</div>',
     unsafe_allow_html=True,
 )
 
@@ -251,66 +283,69 @@ with st.sidebar:
         load_sheet.clear()
         st.rerun()
 
-with st.container(border=True):
-    st.subheader("1．利用条件")
-    表示名 = st.radio(
-        "利用者区分",
-        list(利用者区分マップ.keys()),
-        horizontal=True,
+st.markdown(
+    '<div class="section-title">利用条件</div>',
+    unsafe_allow_html=True,
+)
+表示名 = st.radio(
+    "利用者区分",
+    list(利用者区分マップ.keys()),
+    horizontal=True,
+)
+利用者区分 = 利用者区分マップ[表示名]
+
+曜日 = st.radio(
+    "曜日区分",
+    ["平日", "休日等"],
+    horizontal=True,
+)
+入場料 = st.radio(
+    "入場料区分（ホール利用時）",
+    [
+        "無料～1,000円",
+        "1,001円～3,000円",
+        "3,001円～5,000円",
+        "5,001円～",
+    ],
+    horizontal=True,
+)
+
+st.markdown(
+    '<div class="section-title">利用施設・時間帯</div>',
+    unsafe_allow_html=True,
+)
+header_columns = st.columns([1.6, 1, 1, 1], gap="small")
+for column, label in zip(
+    header_columns,
+    ["施設名", "午前", "午後", "夜間"],
+):
+    column.markdown(
+        f'<div class="facility-header">{label}</div>',
+        unsafe_allow_html=True,
     )
-    利用者区分 = 利用者区分マップ[表示名]
 
-    曜日 = st.radio(
-        "曜日区分",
-        ["平日", "休日等"],
-        horizontal=True,
+選択時間帯 = {}
+for facility, _ in 施設一覧:
+    selected_before_render = any(
+        st.session_state.get(f"{facility}_{time}", False)
+        for time in 時間区分候補
     )
-    入場料 = st.radio(
-        "入場料区分（ホール利用時）",
-        [
-            "無料～1,000円",
-            "1,001円～3,000円",
-            "3,001円～5,000円",
-            "5,001円～",
-        ],
-        horizontal=True,
+    selected_class = " selected" if selected_before_render else ""
+
+    columns = st.columns([1.6, 1, 1, 1], gap="small")
+    columns[0].markdown(
+        f'<div class="facility-name{selected_class}">{facility}</div>',
+        unsafe_allow_html=True,
     )
 
-with st.container(border=True):
-    st.subheader("2．利用施設・時間帯")
-
-    header_columns = st.columns([1.6, 1, 1, 1], gap="small")
-    for column, label in zip(
-        header_columns,
-        ["施設名", "午前", "午後", "夜間"],
-    ):
-        column.markdown(
-            f'<div class="facility-header">{label}</div>',
-            unsafe_allow_html=True,
-        )
-
-    選択時間帯 = {}
-    for facility, _ in 施設一覧:
-        selected_before_render = any(
-            st.session_state.get(f"{facility}_{time}", False)
-            for time in 時間区分候補
-        )
-        selected_class = " selected" if selected_before_render else ""
-
-        columns = st.columns([1.6, 1, 1, 1], gap="small")
-        columns[0].markdown(
-            f'<div class="facility-name{selected_class}">{facility}</div>',
-            unsafe_allow_html=True,
-        )
-
-        選択時間帯[facility] = []
-        for index, time in enumerate(時間区分候補):
-            if columns[index + 1].toggle(
-                time,
-                key=f"{facility}_{time}",
-                label_visibility="collapsed",
-            ):
-                選択時間帯[facility].append(time)
+    選択時間帯[facility] = []
+    for index, time in enumerate(時間区分候補):
+        if columns[index + 1].toggle(
+            time,
+            key=f"{facility}_{time}",
+            label_visibility="collapsed",
+        ):
+            選択時間帯[facility].append(time)
 
 try:
     with st.spinner("料金表を確認しています…"):
@@ -369,7 +404,7 @@ for facility, is_hall in 施設一覧:
             "施設名": facility,
             "利用区分": display_time,
             "規定額": base_price,
-            "減免額": reduction,
+            "減��額": reduction,
             "利用金額": real_price,
         }
     )
@@ -387,18 +422,21 @@ total_row = {
     "施設名": "合計",
     "利用区分": "",
     "規定額": int(df_out["規定額"].sum()),
-    "減免額": int(df_out["減免額"].sum()),
+    "減��額": int(df_out["減��額"].sum()),
     "利用金額": int(df_out["利用金額"].sum()),
 }
 df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
 
-st.subheader("3．計算結果")
+st.markdown(
+    '<div class="section-title">計算結果</div>',
+    unsafe_allow_html=True,
+)
 formatted_table = (
     df_out.style.hide(axis="index")
     .format(
         {
             "規定額": lambda value: f"{int(value):,}",
-            "減免額": lambda value: f"{int(value):,}",
+            "減��額": lambda value: f"{int(value):,}",
             "利用金額": lambda value: f"{int(value):,}",
         }
     )
@@ -412,9 +450,7 @@ st.table(formatted_table)
 total = int(total_row["利用金額"])
 tax = total // 11
 
-result_columns = st.columns([1, 1, 1])
-result_columns[0].metric("規定額合計", f"¥{total_row['規定額']:,}")
-result_columns[1].metric("減免額合計", f"¥{total_row['減免額']:,}")
-result_columns[2].metric("利用金額合計", f"¥{total:,}")
-
-st.info(f"消費税相当額（内税）：¥{tax:,}")
+st.markdown(
+    f'<div class="tax-line">消費税相当額（内税）：<strong>¥{tax:,}</strong></div>',
+    unsafe_allow_html=True,
+)
