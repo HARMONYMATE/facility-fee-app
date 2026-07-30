@@ -97,6 +97,7 @@ def normalize_text(value):
         .replace("\r", "")
         .replace("\u3000", "")
         .replace("〜", "～")
+        .replace("~", "～")
     )
 
 
