@@ -17,7 +17,7 @@ st.markdown(
     .block-container {
         max-width: 1180px;
         padding-top: 0.7rem;
-        padding-bottom: 1rem;
+        padding-bottom: 6rem;
     }
     .app-title {
         color: #1e293b;
@@ -47,14 +47,16 @@ st.markdown(
         padding-bottom: 0.15rem;
         border-bottom: 1px solid #e2e8f0;
     }
-    .facility-name {
-        color: #31333f;
-        font-size: 0.92rem;
-        font-weight: 700;
-        padding-top: 0.25rem;
+    div[data-testid="stButton"] button {
+        min-height: 2.35rem;
     }
-    .facility-name.selected {
-        color: #2563eb;
+    div[data-testid="stButton"] button p {
+        font-weight: 700;
+    }
+    .reset-help {
+        color: #64748b;
+        font-size: 0.78rem;
+        margin-top: -0.2rem;
     }
     div[data-testid="stRadio"] {
         margin-bottom: -0.25rem;
@@ -83,7 +85,12 @@ st.markdown(
         color: #334155;
         font-size: 0.9rem;
         text-align: right;
-        margin-top: 0.2rem;
+        margin-top: 0.45rem;
+        margin-bottom: 4rem;
+        padding: 0.6rem 0.8rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 7px;
     }
     </style>
     """,
@@ -270,6 +277,26 @@ def calculate_prices(
     return display_time, base_price, base_price - real_price, real_price
 
 
+def reset_all_inputs():
+    """料金条件と全施設の時間帯を初期状態に戻す。"""
+    st.session_state["user_category"] = "一般"
+    st.session_state["day_type"] = "平日"
+    st.session_state["admission_fee"] = "無料～1,000円"
+    for facility, _ in 施設一覧:
+        for time in 時間区分候補:
+            st.session_state[f"{facility}_{time}"] = False
+
+
+def toggle_all_times(facility):
+    """施設名ボタンで、その施設の全時間帯を選択または解除する。"""
+    all_selected = all(
+        st.session_state.get(f"{facility}_{time}", False)
+        for time in 時間区分候補
+    )
+    for time in 時間区分候補:
+        st.session_state[f"{facility}_{time}"] = not all_selected
+
+
 st.markdown(
     '<div class="app-title">施設利用料 自動計算ツール</div>'
     '<div class="app-caption">利用条件と時間帯を選択すると、料金を自動計算します。</div>',
@@ -283,14 +310,22 @@ with st.sidebar:
         load_sheet.clear()
         st.rerun()
 
-st.markdown(
+condition_title, reset_column = st.columns([4.5, 1.3], gap="small")
+condition_title.markdown(
     '<div class="section-title">利用条件</div>',
     unsafe_allow_html=True,
+)
+reset_column.button(
+    "↺ 全項目リセット",
+    key="reset_all",
+    on_click=reset_all_inputs,
+    use_container_width=True,
 )
 表示名 = st.radio(
     "利用者区分",
     list(利用者区分マップ.keys()),
     horizontal=True,
+    key="user_category",
 )
 利用者区分 = 利用者区分マップ[表示名]
 
@@ -298,6 +333,7 @@ st.markdown(
     "曜日区分",
     ["平日", "休日等"],
     horizontal=True,
+    key="day_type",
 )
 入場料 = st.radio(
     "入場料区分（ホール利用時）",
@@ -308,6 +344,7 @@ st.markdown(
         "5,001円～",
     ],
     horizontal=True,
+    key="admission_fee",
 )
 
 st.markdown(
@@ -317,7 +354,7 @@ st.markdown(
 header_columns = st.columns([1.6, 1, 1, 1], gap="small")
 for column, label in zip(
     header_columns,
-    ["施設名", "午前", "午後", "夜間"],
+    ["施設名（クリックで全選択／解除）", "午前", "午後", "夜間"],
 ):
     column.markdown(
         f'<div class="facility-header">{label}</div>',
@@ -326,16 +363,20 @@ for column, label in zip(
 
 選択時間帯 = {}
 for facility, _ in 施設一覧:
-    selected_before_render = any(
+    all_selected_before_render = all(
         st.session_state.get(f"{facility}_{time}", False)
         for time in 時間区分候補
     )
-    selected_class = " selected" if selected_before_render else ""
 
     columns = st.columns([1.6, 1, 1, 1], gap="small")
-    columns[0].markdown(
-        f'<div class="facility-name{selected_class}">{facility}</div>',
-        unsafe_allow_html=True,
+    columns[0].button(
+        facility,
+        key=f"{facility}_all_times",
+        on_click=toggle_all_times,
+        args=(facility,),
+        type="primary" if all_selected_before_render else "secondary",
+        help=f"{facility}の午前・午後・夜間を一括選択／解除",
+        use_container_width=True,
     )
 
     選択時間帯[facility] = []
