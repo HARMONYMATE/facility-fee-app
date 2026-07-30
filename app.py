@@ -351,10 +351,11 @@ st.markdown(
     '<div class="section-title">利用施設・時間帯</div>',
     unsafe_allow_html=True,
 )
-header_columns = st.columns([1.6, 1, 1, 1], gap="small")
+facility_column_widths = [1.1, 0.75, 0.75, 0.75, 2.8]
+header_columns = st.columns(facility_column_widths, gap="small")
 for column, label in zip(
     header_columns,
-    ["施設名（クリックで全選択／解除）", "午前", "午後", "夜間"],
+    ["施設名（全選択／解除）", "午前", "午後", "夜間"],
 ):
     column.markdown(
         f'<div class="facility-header">{label}</div>',
@@ -368,14 +369,13 @@ for facility, _ in 施設一覧:
         for time in 時間区分候補
     )
 
-    columns = st.columns([1.6, 1, 1, 1], gap="small")
+    columns = st.columns(facility_column_widths, gap="small")
     columns[0].button(
         facility,
         key=f"{facility}_all_times",
         on_click=toggle_all_times,
         args=(facility,),
         type="primary" if all_selected_before_render else "secondary",
-        help=f"{facility}の午前・午後・夜間を一括選択／解除",
         use_container_width=True,
     )
 
