@@ -162,12 +162,18 @@ def parse_price(value, context):
 
 def find_price_rows(df, facility, is_hall, admission_fee, day_type):
     """選択条件に一致する料金表の行を取得する。"""
-    rows = df[df["貸館施設名"] == facility]
+    # 料金表側はNFKC正規化済みなので、選択値側も同じ形にそろえて比較する。
+    # 例：「第２練習室」→「第2練習室」
+    normalized_facility = normalize_text(facility)
+    rows = df[df["貸館施設名"] == normalized_facility]
 
     if is_hall:
         rows = rows[
-            (rows["徴収する入場料の額"] == admission_fee)
-            & (rows["曜日区分"] == day_type)
+            (
+                rows["徴収する入場料の額"]
+                == normalize_text(admission_fee)
+            )
+            & (rows["曜日区分"] == normalize_text(day_type))
         ]
 
     return rows
