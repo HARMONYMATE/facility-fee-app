@@ -107,6 +107,19 @@ SHEET_ID = "1mzdUGUeCsmmjYY99EEvrxtc4S25DkiFqMO1bnbAjW2o"
     "登録団体 練習": "touroku_RH",
 }
 
+練習料金マップ = {
+    "ippan": "ippan_RH",
+    "ippan_RH": "ippan_RH",
+    "touroku": "touroku_RH",
+    "touroku_RH": "touroku_RH",
+}
+
+ホール利用形態候補 = [
+    "両方とも本番",
+    "メインホールを控室",
+    "小ホールを控室",
+]
+
 施設一覧 = [
     ("メインホール", True),
     ("小ホール", True),
@@ -282,6 +295,7 @@ def reset_all_inputs():
     st.session_state["user_category"] = "一般"
     st.session_state["day_type"] = "平日"
     st.session_state["admission_fee"] = "無料～1,000円"
+    st.session_state["hall_usage_mode"] = "両方とも本番"
     for facility, _ in 施設一覧:
         for time in 時間区分候補:
             st.session_state[f"{facility}_{time}"] = False
@@ -392,14 +406,43 @@ for facility, _ in 施設一覧:
         ):
             選択時間帯[facility].append(time)
 
+両ホール選択中 = bool(選択時間帯["メインホール"]) and bool(
+    選択時間帯["小ホール"]
+)
+
+if 両ホール選択中:
+    ホール利用形態 = st.radio(
+        "両ホール利用時の利用形態",
+        ホール利用形態候補,
+        horizontal=True,
+        key="hall_usage_mode",
+    )
+    st.caption(
+        "控室利用にしたホールは、練習料金・入場料「無料～1,000円」で計算します。"
+    )
+else:
+    st.session_state["hall_usage_mode"] = "両方とも本番"
+    ホール利用形態 = "両方とも本番"
+
+控室利用施設 = {
+    "メインホールを控室": "メインホール",
+    "小ホールを控室": "小ホール",
+}.get(ホール利用形態)
+
 try:
     with st.spinner("料金表を確認しています…"):
         df_base = load_sheet("ippan")
         df_selected = (
             df_base if 利用者区分 == "ippan" else load_sheet(利用者区分)
         )
+        控室料金シート名 = 練習料金マップ[利用者区分]
+        df_control_room = (
+            load_sheet(控室料金シート名) if 控室利用施設 else None
+        )
         validate_sheet(df_base, "ippan")
         validate_sheet(df_selected, 利用者区分)
+        if df_control_room is not None:
+            validate_sheet(df_control_room, 控室料金シート名)
 except Exception as exc:
     st.error(
         "料金表を読み込めませんでした。Google Sheetsの公開設定と表の内容を"
@@ -426,6 +469,13 @@ for facility, is_hall in 施設一覧:
         continue
 
     try:
+        is_control_room = facility == 控室利用施設
+        selected_fee_table = (
+            df_control_room if is_control_room else df_selected
+        )
+        admission_fee_for_facility = (
+            "無料～1,000円" if is_control_room else 入場料
+        )
         (
             display_time,
             base_price,
@@ -435,11 +485,14 @@ for facility, is_hall in 施設一覧:
             facility,
             is_hall,
             selected_times,
-            入場料,
+            admission_fee_for_facility,
             曜日,
             df_base,
-            df_selected,
+            selected_fee_table,
         )
+        if is_hall and 両ホール選択中:
+            usage_label = "控室利用" if is_control_room else "本番利用"
+            display_time = f"{display_time}（{usage_label}）"
     except ValueError as exc:
         calculation_errors.append(str(exc))
         continue
