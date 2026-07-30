@@ -409,8 +409,9 @@ for facility, _ in 施設一覧:
 両ホール選択中 = bool(選択時間帯["メインホール"]) and bool(
     選択時間帯["小ホール"]
 )
+控室選択可能 = 両ホール選択中 and 利用者区分 in {"ippan", "touroku"}
 
-if 両ホール選択中:
+if 控室選択可能:
     ホール利用形態 = st.radio(
         "両ホール利用時の利用形態",
         ホール利用形態候補,
@@ -490,7 +491,7 @@ for facility, is_hall in 施設一覧:
             df_base,
             selected_fee_table,
         )
-        if is_hall and 両ホール選択中:
+        if is_hall and 控室選択可能:
             usage_label = "控室利用" if is_control_room else "本番利用"
             display_time = f"{display_time}（{usage_label}）"
     except ValueError as exc:
