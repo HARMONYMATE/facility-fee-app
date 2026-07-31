@@ -285,7 +285,7 @@ def calculate_prices(
                 selected_rows.iloc[0][selected_time],
                 f"{conditions}／{selected_time}／利用金額",
             )
-        display_time = "・".join(selected_times)
+        display_time = "／".join(selected_times)
 
     return display_time, base_price, base_price - real_price, real_price
 
