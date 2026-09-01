@@ -360,8 +360,8 @@ def apply_pricing_rule(
         is_double_charge = (
             not is_hall or admission_fee == "無料（営利利用）"
         )
-        charged_price = base_price * 2 if is_double_charge else base_price
-        return charged_price, 0, charged_price
+        increase = base_price if is_double_charge else 0
+        return base_price, increase, base_price + increase
 
     return base_price, base_price - real_price, real_price
 
@@ -534,6 +534,7 @@ except Exception as exc:
 
 output_rows = []
 calculation_errors = []
+surcharge_applied = False
 
 for facility, is_hall in 施設一覧:
     selected_times = 選択時間帯[facility]
@@ -544,7 +545,7 @@ for facility, is_hall in 施設一覧:
                 "施設名": facility,
                 "利用区分": "―",
                 "規定額": 0,
-                "減免額": 0,
+                "調整額": 0,
                 "利用金額": 0,
             }
         )
@@ -561,7 +562,7 @@ for facility, is_hall in 施設一覧:
         (
             display_time,
             base_price,
-            reduction,
+            adjustment,
             real_price,
         ) = calculate_prices(
             facility,
@@ -572,13 +573,18 @@ for facility, is_hall in 施設一覧:
             df_base,
             selected_fee_table,
         )
-        base_price, reduction, real_price = apply_pricing_rule(
+        base_price, adjustment, real_price = apply_pricing_rule(
             利用者設定["calculation"],
             is_hall,
             入場料,
             base_price,
             real_price,
         )
+        is_double_charge = (
+            利用者設定["calculation"] == "commercial"
+            and (not is_hall or 入場料 == "無料（営利利用）")
+        )
+        surcharge_applied = surcharge_applied or is_double_charge
         if is_hall and 控室選択可能:
             usage_label = "控室利用" if is_control_room else "本番利用"
             display_time = f"{display_time}（{usage_label}）"
@@ -591,7 +597,7 @@ for facility, is_hall in 施設一覧:
             "施設名": facility,
             "利用区分": display_time,
             "規定額": base_price,
-            "減免額": reduction,
+            "調整額": adjustment,
             "利用金額": real_price,
         }
     )
@@ -604,15 +610,17 @@ if calculation_errors:
     st.stop()
 
 df_out = pd.DataFrame(output_rows)
+adjustment_column = "増加額" if surcharge_applied else "減免額"
 
 total_row = {
     "施設名": "合計",
     "利用区分": "",
     "規定額": int(df_out["規定額"].sum()),
-    "減免額": int(df_out["減免額"].sum()),
+    "調整額": int(df_out["調整額"].sum()),
     "利用金額": int(df_out["利用金額"].sum()),
 }
 df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
+df_out = df_out.rename(columns={"調整額": adjustment_column})
 
 st.markdown(
     '<div class="section-title">計算結果</div>',
@@ -623,15 +631,36 @@ formatted_table = (
     .format(
         {
             "規定額": lambda value: f"{int(value):,}",
-            "減免額": lambda value: f"{int(value):,}",
+            adjustment_column: lambda value: f"{int(value):,}",
             "利用金額": lambda value: f"{int(value):,}",
         }
     )
     .set_properties(
-        subset=["規定額", "減免額", "利用金額"],
+        subset=["規定額", adjustment_column, "利用金額"],
         **{"text-align": "right"},
     )
 )
+if surcharge_applied:
+    formatted_table = formatted_table.set_properties(
+        subset=["増加額"],
+        **{
+            "background-color": "#fff7ed",
+            "color": "#9a3412",
+            "font-weight": "700",
+        },
+    ).set_table_styles(
+        [
+            {
+                "selector": "th.col3",
+                "props": [
+                    ("background-color", "#ffedd5"),
+                    ("color", "#9a3412"),
+                    ("font-weight", "700"),
+                ],
+            }
+        ],
+        overwrite=False,
+    )
 st.table(formatted_table)
 
 total = int(total_row["利用金額"])
