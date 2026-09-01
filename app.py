@@ -16,7 +16,7 @@ st.markdown(
     <style>
     .block-container {
         max-width: 1180px;
-        padding-top: 0.7rem;
+        padding-top: 0.3rem;
         padding-bottom: 6rem;
     }
     .app-title {
@@ -24,19 +24,14 @@ st.markdown(
         font-size: 1.35rem;
         font-weight: 700;
         line-height: 1.3;
-        margin: 0 0 0.1rem 0;
-    }
-    .app-caption {
-        color: #64748b;
-        font-size: 0.88rem;
-        margin: 0 0 0.65rem 0;
+        margin: 0;
     }
     .section-title {
         color: #334155;
         font-size: 1rem;
         font-weight: 700;
         line-height: 1.25;
-        margin: 0.5rem 0 0.2rem 0;
+        margin: 0.25rem 0 0.2rem 0;
         padding-bottom: 0.15rem;
         border-bottom: 1px solid #e2e8f0;
     }
@@ -64,6 +59,27 @@ st.markdown(
     div[data-testid="stRadio"] > label {
         font-size: 0.85rem;
         margin-bottom: 0.05rem;
+    }
+    .st-key-user_category_panel div[role="radiogroup"] {
+        display: grid !important;
+        grid-template-columns: repeat(5, max-content);
+        gap: 0.15rem 0.65rem;
+        align-items: center;
+    }
+    .st-key-user_category_panel div[role="radiogroup"] > label {
+        min-height: 2rem;
+        padding: 0.2rem 0.45rem;
+        border-radius: 6px;
+    }
+    .st-key-user_category_panel div[role="radiogroup"] > label:nth-child(-n+5) {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        font-weight: 700;
+    }
+    @media (max-width: 900px) {
+        .st-key-user_category_panel div[role="radiogroup"] {
+            grid-template-columns: repeat(2, max-content);
+        }
     }
     div[data-testid="stToggle"] {
         margin-bottom: -0.25rem;
@@ -100,18 +116,57 @@ st.markdown(
 
 SHEET_ID = "1mzdUGUeCsmmjYY99EEvrxtc4S25DkiFqMO1bnbAjW2o"
 
-利用者区分マップ = {
-    "一般": "ippan",
-    "一般 練習": "ippan_RH",
-    "登録団体": "touroku",
-    "登録団体 練習": "touroku_RH",
-}
-
-練習料金マップ = {
-    "ippan": "ippan_RH",
-    "ippan_RH": "ippan_RH",
-    "touroku": "touroku_RH",
-    "touroku_RH": "touroku_RH",
+利用者区分設定 = {
+    "一般": {
+        "sheet": "ippan",
+        "control_room_sheet": "ippan_RH",
+        "calculation": "standard",
+    },
+    "一般 練習": {
+        "sheet": "ippan_RH",
+        "control_room_sheet": None,
+        "calculation": "standard",
+    },
+    "登録団体": {
+        "sheet": "touroku",
+        "control_room_sheet": "touroku_RH",
+        "calculation": "standard",
+    },
+    "登録団体 練習": {
+        "sheet": "touroku_RH",
+        "control_room_sheet": None,
+        "calculation": "standard",
+    },
+    "全免": {
+        "sheet": "ippan",
+        "control_room_sheet": None,
+        "calculation": "full_exemption",
+    },
+    "30％減免": {
+        "sheet": "touroku",
+        "control_room_sheet": "touroku_RH",
+        "calculation": "standard",
+    },
+    "30％減免 練習": {
+        "sheet": "touroku_RH",
+        "control_room_sheet": None,
+        "calculation": "standard",
+    },
+    "50％減免": {
+        "sheet": "genmen_50",
+        "control_room_sheet": "genmen_65",
+        "calculation": "standard",
+    },
+    "50％減免 練習": {
+        "sheet": "genmen_65",
+        "control_room_sheet": None,
+        "calculation": "standard",
+    },
+    "音楽文化芸術以外の営利利用": {
+        "sheet": "ippan",
+        "control_room_sheet": None,
+        "calculation": "commercial",
+    },
 }
 
 ホール利用形態候補 = [
@@ -290,6 +345,27 @@ def calculate_prices(
     return display_time, base_price, base_price - real_price, real_price
 
 
+def apply_pricing_rule(
+    calculation,
+    is_hall,
+    admission_fee,
+    base_price,
+    real_price,
+):
+    """全免と営利利用の個別ルールを料金表の取得後に適用する。"""
+    if calculation == "full_exemption":
+        return base_price, base_price, 0
+
+    if calculation == "commercial":
+        is_double_charge = (
+            not is_hall or admission_fee == "無料（営利利用）"
+        )
+        charged_price = base_price * 2 if is_double_charge else base_price
+        return charged_price, 0, charged_price
+
+    return base_price, base_price - real_price, real_price
+
+
 def reset_all_inputs():
     """料金条件と全施設の時間帯を初期状態に戻す。"""
     st.session_state["user_category"] = "一般"
@@ -312,8 +388,7 @@ def toggle_all_times(facility):
 
 
 st.markdown(
-    '<div class="app-title">施設利用料 自動計算ツール</div>'
-    '<div class="app-caption">利用条件と時間帯を選択すると、料金を自動計算します。</div>',
+    '<div class="app-title">施設利用料 自動計算ツール</div>',
     unsafe_allow_html=True,
 )
 
@@ -335,13 +410,15 @@ reset_column.button(
     on_click=reset_all_inputs,
     use_container_width=True,
 )
-表示名 = st.radio(
-    "利用者区分",
-    list(利用者区分マップ.keys()),
-    horizontal=True,
-    key="user_category",
-)
-利用者区分 = 利用者区分マップ[表示名]
+with st.container(key="user_category_panel"):
+    表示名 = st.radio(
+        "利用者区分",
+        list(利用者区分設定.keys()),
+        horizontal=True,
+        key="user_category",
+    )
+利用者設定 = 利用者区分設定[表示名]
+利用者区分 = 利用者設定["sheet"]
 
 曜日 = st.radio(
     "曜日区分",
@@ -356,6 +433,7 @@ reset_column.button(
         "1,001円～3,000円",
         "3,001円～5,000円",
         "5,001円～",
+        "無料（営利利用）",
     ],
     horizontal=True,
     key="admission_fee",
@@ -409,7 +487,10 @@ for facility, _ in 施設一覧:
 両ホール選択中 = bool(選択時間帯["メインホール"]) and bool(
     選択時間帯["小ホール"]
 )
-控室選択可能 = 両ホール選択中 and 利用者区分 in {"ippan", "touroku"}
+控室選択可能 = (
+    両ホール選択中
+    and 利用者設定["control_room_sheet"] is not None
+)
 
 if 控室選択可能:
     ホール利用形態 = st.radio(
@@ -436,7 +517,7 @@ try:
         df_selected = (
             df_base if 利用者区分 == "ippan" else load_sheet(利用者区分)
         )
-        控室料金シート名 = 練習料金マップ[利用者区分]
+        控室料金シート名 = 利用者設定["control_room_sheet"]
         df_control_room = (
             load_sheet(控室料金シート名) if 控室利用施設 else None
         )
@@ -474,9 +555,9 @@ for facility, is_hall in 施設一覧:
         selected_fee_table = (
             df_control_room if is_control_room else df_selected
         )
-        admission_fee_for_facility = (
-            "無料～1,000円" if is_control_room else 入場料
-        )
+        admission_fee_for_facility = 入場料
+        if is_control_room or 入場料 == "無料（営利利用）":
+            admission_fee_for_facility = "無料～1,000円"
         (
             display_time,
             base_price,
@@ -490,6 +571,13 @@ for facility, is_hall in 施設一覧:
             曜日,
             df_base,
             selected_fee_table,
+        )
+        base_price, reduction, real_price = apply_pricing_rule(
+            利用者設定["calculation"],
+            is_hall,
+            入場料,
+            base_price,
+            real_price,
         )
         if is_hall and 控室選択可能:
             usage_label = "控室利用" if is_control_room else "本番利用"
