@@ -16,7 +16,7 @@ st.markdown(
     <style>
     .block-container {
         max-width: 1180px;
-        padding-top: 0.3rem;
+        padding-top: 2.6rem;
         padding-bottom: 6rem;
     }
     .app-title {
