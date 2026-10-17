@@ -5,8 +5,15 @@ import pandas as pd
 import streamlit as st
 
 
+# 設備利用料タブを再表示するときはTrueに変更する。
+SHOW_EQUIPMENT_TAB = False
+
 st.set_page_config(
-    page_title="施設・設備利用料 計算ツール",
+    page_title=(
+        "施設・設備利用料 計算ツール"
+        if SHOW_EQUIPMENT_TAB
+        else "施設利用料 自動計算ツール"
+    ),
     page_icon="🏛️",
     layout="wide",
 )
@@ -693,11 +700,14 @@ def render_equipment_fee():
         iframe(EQUIPMENT_FEE_URL, height=1100, scrolling=True)
 
 
-facility_tab, equipment_tab = st.tabs(["施設利用料", "設備利用料"])
+if SHOW_EQUIPMENT_TAB:
+    facility_tab, equipment_tab = st.tabs(["施設利用料", "設備利用料"])
 
-# 施設料金表の読込失敗によるst.stop()より先に、設備タブを描画する。
-with equipment_tab:
-    render_equipment_fee()
+    # 施設料金表の読込失敗によるst.stop()より先に、設備タブを描画する。
+    with equipment_tab:
+        render_equipment_fee()
 
-with facility_tab:
+    with facility_tab:
+        render_facility_fee()
+else:
     render_facility_fee()
