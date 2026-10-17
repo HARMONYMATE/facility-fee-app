@@ -6,7 +6,7 @@ import streamlit as st
 
 
 st.set_page_config(
-    page_title="施設利用料 自動計算ツール",
+    page_title="施設・設備利用料 計算ツール",
     page_icon="🏛️",
     layout="wide",
 )
@@ -387,286 +387,317 @@ def toggle_all_times(facility):
         st.session_state[f"{facility}_{time}"] = not all_selected
 
 
-st.markdown(
-    '<div class="app-title">施設利用料 自動計算ツール</div>',
-    unsafe_allow_html=True,
-)
-
-with st.sidebar:
-    st.subheader("料金表")
-    st.caption("料金表は10分間キャッシュされます。")
-    if st.button("料金表を再読み込み", use_container_width=True):
-        load_sheet.clear()
-        st.rerun()
-
-condition_title, reset_column = st.columns([4.5, 1.3], gap="small")
-condition_title.markdown(
-    '<div class="section-title">利用条件</div>',
-    unsafe_allow_html=True,
-)
-reset_column.button(
-    "↺ 全項目リセット",
-    key="reset_all",
-    on_click=reset_all_inputs,
-    use_container_width=True,
-)
-with st.container(key="user_category_panel"):
-    表示名 = st.radio(
-        "利用者区分",
-        list(利用者区分設定.keys()),
-        horizontal=True,
-        key="user_category",
-    )
-利用者設定 = 利用者区分設定[表示名]
-利用者区分 = 利用者設定["sheet"]
-
-曜日 = st.radio(
-    "曜日区分",
-    ["平日", "休日等"],
-    horizontal=True,
-    key="day_type",
-)
-入場料 = st.radio(
-    "入場料区分（ホール利用時）",
-    [
-        "無料～1,000円",
-        "1,001円～3,000円",
-        "3,001円～5,000円",
-        "5,001円～",
-        "無料（営利利用）",
-    ],
-    horizontal=True,
-    key="admission_fee",
-)
-
-st.markdown(
-    '<div class="section-title">利用施設・時間帯</div>',
-    unsafe_allow_html=True,
-)
-facility_column_widths = [1.1, 0.75, 0.75, 0.75, 2.8]
-header_columns = st.columns(facility_column_widths, gap="small")
-for column, label in zip(
-    header_columns,
-    ["施設名（全選択／解除）", "午前", "午後", "夜間"],
-):
-    column.markdown(
-        f'<div class="facility-header">{label}</div>',
+def render_facility_fee():
+    """施設利用料の既存画面を表示する。"""
+    st.markdown(
+        '<div class="app-title">施設利用料 自動計算ツール</div>',
         unsafe_allow_html=True,
     )
 
-選択時間帯 = {}
-for facility, _ in 施設一覧:
-    any_selected_before_render = any(
-        st.session_state.get(f"{facility}_{time}", False)
-        for time in 時間区分候補
-    )
-    all_selected_before_render = all(
-        st.session_state.get(f"{facility}_{time}", False)
-        for time in 時間区分候補
-    )
+    with st.sidebar:
+        st.subheader("料金表")
+        st.caption("料金表は10分間キャッシュされます。")
+        if st.button("料金表を再読み込み", use_container_width=True):
+            load_sheet.clear()
+            st.rerun()
 
-    columns = st.columns(facility_column_widths, gap="small")
-    columns[0].button(
-        facility,
-        key=f"{facility}_all_times",
-        on_click=toggle_all_times,
-        args=(facility,),
-        type="primary" if any_selected_before_render else "secondary",
+    condition_title, reset_column = st.columns([4.5, 1.3], gap="small")
+    condition_title.markdown(
+        '<div class="section-title">利用条件</div>',
+        unsafe_allow_html=True,
+    )
+    reset_column.button(
+        "↺ 全項目リセット",
+        key="reset_all",
+        on_click=reset_all_inputs,
         use_container_width=True,
     )
+    with st.container(key="user_category_panel"):
+        表示名 = st.radio(
+            "利用者区分",
+            list(利用者区分設定.keys()),
+            horizontal=True,
+            key="user_category",
+        )
+    利用者設定 = 利用者区分設定[表示名]
+    利用者区分 = 利用者設定["sheet"]
 
-    選択時間帯[facility] = []
-    for index, time in enumerate(時間区分候補):
-        if columns[index + 1].toggle(
-            time,
-            key=f"{facility}_{time}",
-            label_visibility="collapsed",
-        ):
-            選択時間帯[facility].append(time)
-
-両ホール選択中 = bool(選択時間帯["メインホール"]) and bool(
-    選択時間帯["小ホール"]
-)
-控室選択可能 = (
-    両ホール選択中
-    and 利用者設定["control_room_sheet"] is not None
-)
-
-if 控室選択可能:
-    ホール利用形態 = st.radio(
-        "両ホール利用時の利用形態",
-        ホール利用形態候補,
+    曜日 = st.radio(
+        "曜日区分",
+        ["平日", "休日等"],
         horizontal=True,
-        key="hall_usage_mode",
+        key="day_type",
     )
-    st.caption(
-        "控室利用にしたホールは、練習料金・入場料「無料～1,000円」で計算します。"
+    入場料 = st.radio(
+        "入場料区分（ホール利用時）",
+        [
+            "無料～1,000円",
+            "1,001円～3,000円",
+            "3,001円～5,000円",
+            "5,001円～",
+            "無料（営利利用）",
+        ],
+        horizontal=True,
+        key="admission_fee",
     )
-else:
-    st.session_state["hall_usage_mode"] = "両方とも本番"
-    ホール利用形態 = "両方とも本番"
 
-控室利用施設 = {
-    "メインホールを控室": "メインホール",
-    "小ホールを控室": "小ホール",
-}.get(ホール利用形態)
-
-try:
-    with st.spinner("料金表を確認しています…"):
-        df_base = load_sheet("ippan")
-        df_selected = (
-            df_base if 利用者区分 == "ippan" else load_sheet(利用者区分)
+    st.markdown(
+        '<div class="section-title">利用施設・時間帯</div>',
+        unsafe_allow_html=True,
+    )
+    facility_column_widths = [1.1, 0.75, 0.75, 0.75, 2.8]
+    header_columns = st.columns(facility_column_widths, gap="small")
+    for column, label in zip(
+        header_columns,
+        ["施設名（全選択／解除）", "午前", "午後", "夜間"],
+    ):
+        column.markdown(
+            f'<div class="facility-header">{label}</div>',
+            unsafe_allow_html=True,
         )
-        控室料金シート名 = 利用者設定["control_room_sheet"]
-        df_control_room = (
-            load_sheet(控室料金シート名) if 控室利用施設 else None
+
+    選択時間帯 = {}
+    for facility, _ in 施設一覧:
+        any_selected_before_render = any(
+            st.session_state.get(f"{facility}_{time}", False)
+            for time in 時間区分候補
         )
-        validate_sheet(df_base, "ippan")
-        validate_sheet(df_selected, 利用者区分)
-        if df_control_room is not None:
-            validate_sheet(df_control_room, 控室料金シート名)
-except Exception as exc:
-    st.error(
-        "料金表を読み込めませんでした。Google Sheetsの公開設定と表の内容を"
-        f"確認してください。\n\n詳細：{exc}"
+        all_selected_before_render = all(
+            st.session_state.get(f"{facility}_{time}", False)
+            for time in 時間区分候補
+        )
+
+        columns = st.columns(facility_column_widths, gap="small")
+        columns[0].button(
+            facility,
+            key=f"{facility}_all_times",
+            on_click=toggle_all_times,
+            args=(facility,),
+            type="primary" if any_selected_before_render else "secondary",
+            use_container_width=True,
+        )
+
+        選択時間帯[facility] = []
+        for index, time in enumerate(時間区分候補):
+            if columns[index + 1].toggle(
+                time,
+                key=f"{facility}_{time}",
+                label_visibility="collapsed",
+            ):
+                選択時間帯[facility].append(time)
+
+    両ホール選択中 = bool(選択時間帯["メインホール"]) and bool(
+        選択時間帯["小ホール"]
     )
-    st.stop()
+    控室選択可能 = (
+        両ホール選択中
+        and 利用者設定["control_room_sheet"] is not None
+    )
 
-output_rows = []
-calculation_errors = []
-surcharge_applied = False
+    if 控室選択可能:
+        ホール利用形態 = st.radio(
+            "両ホール利用時の利用形態",
+            ホール利用形態候補,
+            horizontal=True,
+            key="hall_usage_mode",
+        )
+        st.caption(
+            "控室利用にしたホールは、練習料金・入場料「無料～1,000円」で計算します。"
+        )
+    else:
+        st.session_state["hall_usage_mode"] = "両方とも本番"
+        ホール利用形態 = "両方とも本番"
 
-for facility, is_hall in 施設一覧:
-    selected_times = 選択時間帯[facility]
+    控室利用施設 = {
+        "メインホールを控室": "メインホール",
+        "小ホールを控室": "小ホール",
+    }.get(ホール利用形態)
 
-    if not selected_times:
+    try:
+        with st.spinner("料金表を確認しています…"):
+            df_base = load_sheet("ippan")
+            df_selected = (
+                df_base if 利用者区分 == "ippan" else load_sheet(利用者区分)
+            )
+            控室料金シート名 = 利用者設定["control_room_sheet"]
+            df_control_room = (
+                load_sheet(控室料金シート名) if 控室利用施設 else None
+            )
+            validate_sheet(df_base, "ippan")
+            validate_sheet(df_selected, 利用者区分)
+            if df_control_room is not None:
+                validate_sheet(df_control_room, 控室料金シート名)
+    except Exception as exc:
+        st.error(
+            "料金表を読み込めませんでした。Google Sheetsの公開設定と表の内容を"
+            f"確認してください。\n\n詳細：{exc}"
+        )
+        st.stop()
+
+    output_rows = []
+    calculation_errors = []
+    surcharge_applied = False
+
+    for facility, is_hall in 施設一覧:
+        selected_times = 選択時間帯[facility]
+
+        if not selected_times:
+            output_rows.append(
+                {
+                    "施設名": facility,
+                    "利用区分": "―",
+                    "規定額": 0,
+                    "調整額": 0,
+                    "利用金額": 0,
+                }
+            )
+            continue
+
+        try:
+            is_control_room = facility == 控室利用施設
+            selected_fee_table = (
+                df_control_room if is_control_room else df_selected
+            )
+            admission_fee_for_facility = 入場料
+            if is_control_room or 入場料 == "無料（営利利用）":
+                admission_fee_for_facility = "無料～1,000円"
+            (
+                display_time,
+                base_price,
+                adjustment,
+                real_price,
+            ) = calculate_prices(
+                facility,
+                is_hall,
+                selected_times,
+                admission_fee_for_facility,
+                曜日,
+                df_base,
+                selected_fee_table,
+            )
+            base_price, adjustment, real_price = apply_pricing_rule(
+                利用者設定["calculation"],
+                is_hall,
+                入場料,
+                base_price,
+                real_price,
+            )
+            is_double_charge = (
+                利用者設定["calculation"] == "commercial"
+                and (not is_hall or 入場料 == "無料（営利利用）")
+            )
+            surcharge_applied = surcharge_applied or is_double_charge
+            if is_hall and 控室選択可能:
+                usage_label = "控室利用" if is_control_room else "本番利用"
+                display_time = f"{display_time}（{usage_label}）"
+        except ValueError as exc:
+            calculation_errors.append(str(exc))
+            continue
+
         output_rows.append(
             {
                 "施設名": facility,
-                "利用区分": "―",
-                "規定額": 0,
-                "調整額": 0,
-                "利用金額": 0,
+                "利用区分": display_time,
+                "規定額": base_price,
+                "調整額": adjustment,
+                "利用金額": real_price,
             }
         )
-        continue
 
-    try:
-        is_control_room = facility == 控室利用施設
-        selected_fee_table = (
-            df_control_room if is_control_room else df_selected
+    if calculation_errors:
+        st.error(
+            "料金を確定できない項目があります。料金表を確認してください。\n\n"
+            + "\n\n".join(f"・{message}" for message in calculation_errors)
         )
-        admission_fee_for_facility = 入場料
-        if is_control_room or 入場料 == "無料（営利利用）":
-            admission_fee_for_facility = "無料～1,000円"
-        (
-            display_time,
-            base_price,
-            adjustment,
-            real_price,
-        ) = calculate_prices(
-            facility,
-            is_hall,
-            selected_times,
-            admission_fee_for_facility,
-            曜日,
-            df_base,
-            selected_fee_table,
-        )
-        base_price, adjustment, real_price = apply_pricing_rule(
-            利用者設定["calculation"],
-            is_hall,
-            入場料,
-            base_price,
-            real_price,
-        )
-        is_double_charge = (
-            利用者設定["calculation"] == "commercial"
-            and (not is_hall or 入場料 == "無料（営利利用）")
-        )
-        surcharge_applied = surcharge_applied or is_double_charge
-        if is_hall and 控室選択可能:
-            usage_label = "控室利用" if is_control_room else "本番利用"
-            display_time = f"{display_time}（{usage_label}）"
-    except ValueError as exc:
-        calculation_errors.append(str(exc))
-        continue
+        st.stop()
 
-    output_rows.append(
-        {
-            "施設名": facility,
-            "利用区分": display_time,
-            "規定額": base_price,
-            "調整額": adjustment,
-            "利用金額": real_price,
-        }
+    df_out = pd.DataFrame(output_rows)
+    adjustment_column = "増加額" if surcharge_applied else "減免額"
+
+    total_row = {
+        "施設名": "合計",
+        "利用区分": "",
+        "規定額": int(df_out["規定額"].sum()),
+        "調整額": int(df_out["調整額"].sum()),
+        "利用金額": int(df_out["利用金額"].sum()),
+    }
+    df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
+    df_out = df_out.rename(columns={"調整額": adjustment_column})
+
+    st.markdown(
+        '<div class="section-title">計算結果</div>',
+        unsafe_allow_html=True,
     )
-
-if calculation_errors:
-    st.error(
-        "料金を確定できない項目があります。料金表を確認してください。\n\n"
-        + "\n\n".join(f"・{message}" for message in calculation_errors)
-    )
-    st.stop()
-
-df_out = pd.DataFrame(output_rows)
-adjustment_column = "増加額" if surcharge_applied else "減免額"
-
-total_row = {
-    "施設名": "合計",
-    "利用区分": "",
-    "規定額": int(df_out["規定額"].sum()),
-    "調整額": int(df_out["調整額"].sum()),
-    "利用金額": int(df_out["利用金額"].sum()),
-}
-df_out = pd.concat([df_out, pd.DataFrame([total_row])], ignore_index=True)
-df_out = df_out.rename(columns={"調整額": adjustment_column})
-
-st.markdown(
-    '<div class="section-title">計算結果</div>',
-    unsafe_allow_html=True,
-)
-formatted_table = (
-    df_out.style.hide(axis="index")
-    .format(
-        {
-            "規定額": lambda value: f"{int(value):,}",
-            adjustment_column: lambda value: f"{int(value):,}",
-            "利用金額": lambda value: f"{int(value):,}",
-        }
-    )
-    .set_properties(
-        subset=["規定額", adjustment_column, "利用金額"],
-        **{"text-align": "right"},
-    )
-)
-if surcharge_applied:
-    formatted_table = formatted_table.set_properties(
-        subset=["増加額"],
-        **{
-            "background-color": "#fff7ed",
-            "color": "#9a3412",
-            "font-weight": "700",
-        },
-    ).set_table_styles(
-        [
+    formatted_table = (
+        df_out.style.hide(axis="index")
+        .format(
             {
-                "selector": "th.col3",
-                "props": [
-                    ("background-color", "#ffedd5"),
-                    ("color", "#9a3412"),
-                    ("font-weight", "700"),
-                ],
+                "規定額": lambda value: f"{int(value):,}",
+                adjustment_column: lambda value: f"{int(value):,}",
+                "利用金額": lambda value: f"{int(value):,}",
             }
-        ],
-        overwrite=False,
+        )
+        .set_properties(
+            subset=["規定額", adjustment_column, "利用金額"],
+            **{"text-align": "right"},
+        )
     )
-st.table(formatted_table)
+    if surcharge_applied:
+        formatted_table = formatted_table.set_properties(
+            subset=["増加額"],
+            **{
+                "background-color": "#fff7ed",
+                "color": "#9a3412",
+                "font-weight": "700",
+            },
+        ).set_table_styles(
+            [
+                {
+                    "selector": "th.col3",
+                    "props": [
+                        ("background-color", "#ffedd5"),
+                        ("color", "#9a3412"),
+                        ("font-weight", "700"),
+                    ],
+                }
+            ],
+            overwrite=False,
+        )
+    st.table(formatted_table)
 
-total = int(total_row["利用金額"])
-tax = total // 11
+    total = int(total_row["利用金額"])
+    tax = total // 11
 
-st.markdown(
-    f'<div class="tax-line">消費税相当額（内税）：<strong>¥{tax:,}</strong></div>',
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        f'<div class="tax-line">消費税相当額（内税）：<strong>¥{tax:,}</strong></div>',
+        unsafe_allow_html=True,
+    )
+
+
+EQUIPMENT_FEE_URL = "https://equipment-fee-prototype.agath4.chatgpt.site"
+
+
+def render_equipment_fee():
+    """公開中の設備ツールを表示し、設備側の更新をそのまま反映する。"""
+    st.link_button("設備利用料を別画面で開く", EQUIPMENT_FEE_URL)
+    if hasattr(st, "iframe"):
+        st.iframe(
+            EQUIPMENT_FEE_URL,
+            height=1100,
+            alt="設備利用料金の入力・計算・帳票印刷",
+        )
+    else:
+        # Streamlit 1.56未満の公開環境でも、依存関係を変更せず表示する。
+        from streamlit.components.v1 import iframe
+
+        iframe(EQUIPMENT_FEE_URL, height=1100, scrolling=True)
+
+
+facility_tab, equipment_tab = st.tabs(["施設利用料", "設備利用料"])
+
+# 施設料金表の読込失敗によるst.stop()より先に、設備タブを描画する。
+with equipment_tab:
+    render_equipment_fee()
+
+with facility_tab:
+    render_facility_fee()
