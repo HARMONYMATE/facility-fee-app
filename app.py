@@ -1,8 +1,56 @@
+from importlib.metadata import PackageNotFoundError, version as package_version
 import unicodedata
 from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
+from packaging.version import InvalidVersion, Version
+
+
+# CVE-2026-111497（HTTP2Shell／Node2Shell）の影響を受けるBrotliを、
+# Community Cloudの実行環境へ将来混入させないための起動時確認。
+# このアプリ自身はBrotliを使用しないため、未導入ならそのまま続行する。
+BROTLI_VULNERABLE_RANGES = (
+    (Version("1.0.3"), Version("1.0.10")),
+    (Version("1.1.0"), Version("1.1.1")),
+    (Version("1.2.0"), Version("1.2.1")),
+)
+
+
+def is_vulnerable_brotli_version(installed_version_text):
+    """BrotliのバージョンがCVE-2026-111497の影響範囲か判定する。"""
+    try:
+        installed_version = Version(installed_version_text)
+    except InvalidVersion as exc:
+        raise RuntimeError(
+            "Brotliのバージョンを安全に判定できません。"
+        ) from exc
+
+    return any(
+        lower <= installed_version < upper
+        for lower, upper in BROTLI_VULNERABLE_RANGES
+    )
+
+
+def verify_brotli_runtime():
+    """脆弱なBrotli実装が見つかった場合は公開処理を開始しない。"""
+    vulnerable_packages = []
+
+    for distribution_name in ("Brotli", "brotlicffi"):
+        try:
+            installed_version_text = package_version(distribution_name)
+        except PackageNotFoundError:
+            continue
+
+        if is_vulnerable_brotli_version(installed_version_text):
+            vulnerable_packages.append(distribution_name)
+
+    if vulnerable_packages:
+        package_names = "、".join(vulnerable_packages)
+        raise RuntimeError(
+            "安全でないBrotli実装を検出したため、アプリの起動を停止しました："
+            f"{package_names}"
+        )
 
 
 # 設備利用料タブを再表示するときはTrueに変更する。
@@ -17,6 +65,8 @@ st.set_page_config(
     page_icon="🏛️",
     layout="wide",
 )
+
+verify_brotli_runtime()
 
 st.markdown(
     """
